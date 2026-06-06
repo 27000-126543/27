@@ -72,6 +72,8 @@ class QueryService:
             result.append({
                 "id": r.id, "code": r.record_code,
                 "salesperson_id": r.salesperson_id,
+                "order_id": r.order_id,
+                "original_record_id": r.original_record_id,
                 "salesperson_name": r.salesperson.user.full_name if r.salesperson and r.salesperson.user else None,
                 "salesperson_code": r.salesperson.salesperson_code if r.salesperson else None,
                 "period": f"{r.period_year}-{r.period_month:02d}",
@@ -85,6 +87,8 @@ class QueryService:
                 "total_commission": r.total_commission,
                 "approval_status": r.approval_status.value,
                 "is_paid": r.is_paid,
+                "is_corrected": r.is_corrected,
+                "remarks": r.remarks,
                 "created_at": r.created_at.isoformat() if r.created_at else None
             })
 

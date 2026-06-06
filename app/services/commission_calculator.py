@@ -265,30 +265,37 @@ class CommissionService:
     def recalculate_record(self, record_id: int, user_id: int,
                             username: str) -> Optional[CommissionRecord]:
         """复核后修正并重算单条佣金记录"""
+        import uuid
         record = self.db.query(CommissionRecord).filter(
             CommissionRecord.id == record_id
         ).first()
         if not record:
             return None
 
-        if record.order:
-            new_records = self._calculate_order_commission(record.order, record.period_year, record.period_month)
-            for nr in new_records:
-                if nr.product_category == record.product_category:
-                    record.is_corrected = True
-                    nr.original_record_id = record.id
-                    nr.approval_status = ApprovalStatus.PENDING
-                    nr.remarks = f"修正自记录 {record.record_code}"
-                    suffix = datetime.now().strftime("%H%M%S%f")[:8]
-                    nr.record_code = f"{record.record_code}R{suffix}"
-                    self.db.add(nr)
+        if not record.order:
+            return None
 
-                    self._log_action(user_id, username, LogAction.RECALCULATE,
-                                    "commission", record.id, record.record_code,
-                                    f"原金额:{record.total_commission},新金额:{nr.total_commission}")
-                    self.db.commit()
-                    self.db.refresh(nr)
-                    return nr
+        record.is_corrected = True
+        self.db.flush()
+
+        new_records = self._calculate_order_commission(record.order, record.period_year, record.period_month)
+        for nr in new_records:
+            if nr.product_category != record.product_category:
+                continue
+
+            nr.original_record_id = record.id
+            nr.approval_status = ApprovalStatus.PENDING
+            nr.remarks = f"修正自记录 {record.record_code}"
+            unique_suffix = uuid.uuid4().hex[:8].upper()
+            nr.record_code = f"{record.record_code}R{unique_suffix}"
+            self.db.add(nr)
+
+            self._log_action(user_id, username, LogAction.RECALCULATE,
+                            "commission", record.id, record.record_code,
+                            f"原金额:{record.total_commission},新金额:{nr.total_commission},原记录已标记is_corrected=True")
+            self.db.commit()
+            self.db.refresh(nr)
+            return nr
         return None
 
     def get_commission_summary(self, period_year: int, period_month: int,
